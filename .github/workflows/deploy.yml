@@ -12,7 +12,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Ensure todos.json exists to prevent app crash
+      # Ensure todos.json exists (critical for app startup)
       - name: Create todos.json if missing
         run: |
           if [ ! -f todos.json ]; then
@@ -31,12 +31,11 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and Push Docker Image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/todo-aapi:latest
+      # Use direct docker build/push to avoid Buildx cache issues
+      - name: Build and Push Docker Image (no cache)
+        run: |
+          docker build --no-cache -t ${{ secrets.DOCKERHUB_USERNAME }}/todo-aapi:latest .
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/todo-aapi:latest
 
       - name: Install SSH key
         uses: webfactory/ssh-agent@v0.9.0
