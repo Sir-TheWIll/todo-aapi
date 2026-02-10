@@ -1,0 +1,30 @@
+[
+  {
+    "id": 1,
+    "title": "Learn Docker basics",
+    "description": "Understand containers, images, and Dockerfiles",
+    "completed": false,
+    "created_at": "2025-01-01T10:00:00"
+  },
+  {
+    "id": 2,
+    "title": "Build first Docker image",
+    "description": "Create a Dockerfile and build an image",
+    "completed": false,
+    "created_at": "2025-01-01T11:00:00"
+  },
+  {
+    "id": 3,
+    "title": "Run Docker container",
+    "description": "Successfully run a container from the built image",
+    "completed": false,
+    "created_at": "2025-01-01T12:00:00"
+  },
+  {
+    "id": 4,
+    "title": "I want to automate this by adding a ci/cd pipeline to deploy image to AWS",
+    "description": "This is the assignment.",
+    "completed": false,
+    "created_at": "2026-02-10T12:07:51.592625"
+  }
+]

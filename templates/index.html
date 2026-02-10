@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Todo API — Web UI</title>
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body>
+    <div class="app">
+      <header class="hero">
+        <div class="container">
+          <h1>Todo List</h1>
+          <p class="subtitle">Beautiful, minimal UI backed by the Todo API</p>
+        </div>
+      </header>
+
+      <main class="container">
+        <section class="controls">
+          <form id="addForm" class="add-form">
+            <input id="title" placeholder="Add a new todo title" required />
+            <input id="description" placeholder="Optional description" />
+            <button type="submit">Add</button>
+          </form>
+        </section>
+
+        <section>
+          <ul id="todosList" class="todos"></ul>
+        </section>
+      </main>
+
+      <footer class="container footer">Built with ❤️ — Todo API</footer>
+    </div>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Todo API — Web UI</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Todo List</h1>
+      <p class="subtitle">Simple, fast, and delightful — backed by your Todo API</p>
+    </header>
+
+    <section class="new-todo">
+      <input id="title" placeholder="What do you want to do?" />
+      <input id="description" placeholder="Description (optional)" />
+      <button id="addBtn">Add Todo</button>
+    </section>
+
+    <section>
+      <h2>Todos</h2>
+      <ul id="todos" class="todo-list"></ul>
+    </section>
+
+    <footer>
+      <small>Powered by the <strong>todo-api</strong></small>
+    </footer>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
