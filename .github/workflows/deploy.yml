@@ -1,28 +1,74 @@
-- name: Deploy to AWS EC2
-  uses: webfactory/ssh-agent@v0.9.0
-  with:
-    ssh-private-key: ${{ secrets.AWS_SSH_KEY }}
+name: CI/CD to AWS EC2
 
-- name: Run remote deployment script
-  run: |
-    # Retry SSH up to 3 times
-    for i in {1..3}; do
-      if ssh -o ConnectTimeout=30 -o StrictHostKeyChecking=no \
-           ${{ secrets.AWS_SSH_USER }}@${{ secrets.AWS_SSH_HOST }} "echo 'Connected!'; exit 0"; then
-        echo "✅ SSH succeeded on attempt $i"
-        break
-      else
-        echo "❌ SSH failed (attempt $i). Retrying..."
-        sleep 5
-      fi
-    done
+on:
+  push:
+    branches: [ main ]
 
-    # Now deploy
-    ssh -o ConnectTimeout=30 -o StrictHostKeyChecking=no \
-      ${{ secrets.AWS_SSH_USER }}@${{ secrets.AWS_SSH_HOST }} << 'EOF'
-      docker pull thewill146/task-manager:latest
-      docker stop task-manager 2>/dev/null || true
-      docker rm task-manager 2>/dev/null || true
-      docker run -d --name task-manager -p 80:3000 thewill146/task-manager:latest
-      echo "Deployment complete."
-    EOF
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/task-manager:latest
+
+      - name: Install SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.AWS_SSH_KEY }}
+
+      - name: Test SSH connectivity with retries
+        run: |
+          echo "🔍 Testing SSH connection to EC2..."
+          MAX_RETRIES=3
+          RETRY_COUNT=0
+          until ssh -o ConnectTimeout=20 -o StrictHostKeyChecking=no \
+                   ${{ secrets.AWS_SSH_USER }}@${{ secrets.AWS_SSH_HOST }} "echo '✅ SSH connection successful'"; do
+            RETRY_COUNT=$((RETRY_COUNT+1))
+            if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
+              echo "❌ Failed to connect via SSH after $MAX_RETRIES attempts."
+              exit 1
+            fi
+            echo "⚠️ SSH attempt $RETRY_COUNT failed. Retrying in 10 seconds..."
+            sleep 10
+          done
+
+      - name: Deploy to EC2
+        run: |
+          ssh -o ConnectTimeout=20 -o StrictHostKeyChecking=no \
+            ${{ secrets.AWS_SSH_USER }}@${{ secrets.AWS_SSH_HOST }} << 'EOF'
+            echo "🔄 Pulling latest Docker image..."
+            docker pull $DOCKERHUB_USERNAME/task-manager:latest
+
+            echo "🛑 Stopping old container (if running)..."
+            docker stop task-manager 2>/dev/null || true
+            docker rm task-manager 2>/dev/null || true
+
+            echo "🚀 Starting new container..."
+            docker run -d \
+              --name task-manager \
+              --restart unless-stopped \
+              -p 80:3000 \
+              $DOCKERHUB_USERNAME/task-manager:latest
+
+            echo "✅ Deployment completed! Container status:"
+            docker ps -f name=task-manager --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+          EOF
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
