@@ -1,0 +1,56 @@
+name: CI/CD to AWS EC2
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/task-manager:latest
+
+      - name: Deploy to AWS EC2
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.AWS_SSH_KEY }}
+
+      - name: Run remote deployment script
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.AWS_SSH_USER }}@${{ secrets.AWS_SSH_HOST }} << 'EOF'
+            echo "🔄 Updating task-manager..."
+            # Pull latest image
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/task-manager:latest
+
+            # Stop & remove old container (if exists)
+            docker stop task-manager 2>/dev/null || true
+            docker rm task-manager 2>/dev/null || true
+
+            # Run new container (assume app listens on port 3000)
+            docker run -d \
+              --name task-manager \
+              --restart unless-stopped \
+              -p 80:3000 \
+              ${{ secrets.DOCKERHUB_USERNAME }}/task-manager:latest
+
+            echo "✅ Deployment completed!"
+            docker ps -f name=task-manager
+          EOF
