@@ -10,7 +10,7 @@ COPY todos.json .
 # Instead of COPY templates/ templates/, copy the file directly:
 COPY templates/index.html templates/index.html
 
-# Copy the styles too 
+# Copy the styles too and the js
 COPY static/app.js static/app.js 
 COPY static/styles.css static/styles.css
 
