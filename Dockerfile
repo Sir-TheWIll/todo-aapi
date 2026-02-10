@@ -7,7 +7,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app.py .
 COPY todos.json .
-COPY templates templates/   # ✅ NO trailing slash on source
+# Instead of COPY templates/ templates/, copy the file directly:
+COPY templates/index.html templates/index.html
 
 EXPOSE 5000
 ENV PORT=5000

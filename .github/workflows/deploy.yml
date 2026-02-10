@@ -12,29 +12,25 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Ensure todos.json exists (critical for app startup)
       - name: Create todos.json if missing
         run: |
           if [ ! -f todos.json ]; then
             echo "[]"> todos.json
             echo "⚠️ Created empty todos.json"
-          else
-            echo "✅ todos.json already exists"
           fi
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Set up Docker
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker.io
+          sudo systemctl start docker
+          sudo usermod -aG docker runner
+          newgrp docker
 
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      # Use direct docker build/push to avoid Buildx cache issues
-      - name: Build and Push Docker Image (no cache)
+      - name: Build and Push Docker Image
         run: |
           docker build --no-cache -t ${{ secrets.DOCKERHUB_USERNAME }}/todo-aapi:latest .
+          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/todo-aapi:latest
 
       - name: Install SSH key
@@ -42,49 +38,16 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.AWS_SSH_KEY }}
 
-      - name: Test SSH connectivity with retries
-        run: |
-          echo "🔍 Testing SSH connection to EC2..."
-          MAX_RETRIES=3
-          RETRY_COUNT=0
-          until ssh -o ConnectTimeout=20 -o StrictHostKeyChecking=no \
-                   ${{ secrets.AWS_SSH_USER }}@${{ secrets.AWS_SSH_HOST }} "echo '✅ SSH connected'"; do
-            RETRY_COUNT=$((RETRY_COUNT+1))
-            if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
-              echo "❌ SSH failed after $MAX_RETRIES attempts."
-              exit 1
-            fi
-            echo "⚠️ Retry $RETRY_COUNT in 10s..."
-            sleep 10
-          done
-
-      - name: Deploy Todo API to EC2
+      - name: Deploy to EC2
         run: |
           ssh -o ConnectTimeout=20 -o StrictHostKeyChecking=no \
             ${{ secrets.AWS_SSH_USER }}@${{ secrets.AWS_SSH_HOST }} << EOF
-            set -e  # Exit on any error
-
-            echo "🔄 Pulling latest todo-aapi image..."
+            set -e
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/todo-aapi:latest
-
-            echo "🛑 Stopping old container..."
             docker stop todo-api 2>/dev/null || true
             docker rm todo-api 2>/dev/null || true
-
-            echo "🚀 Starting new container (host port 80 → container port 5000)..."
-            docker run -d \
-              --name todo-api \
-              --restart unless-stopped \
-              -p 80:5000 \
-              ${{ secrets.DOCKERHUB_USERNAME }}/todo-aapi:latest
-
-            echo "⏳ Waiting 5 seconds for app to start..."
+            docker run -d --name todo-api --restart unless-stopped -p 80:5000 ${{ secrets.DOCKERHUB_USERNAME }}/todo-aapi:latest
             sleep 5
-
-            echo "✅ Deployment complete! Container status:"
-            docker ps -f name=todo-api --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
-
-            echo "🧪 Testing health endpoint via mapped port 80..."
             curl -f http://localhost:80/health
-            echo -e "\n🎉 Health check passed! API is live."
+            echo "✅ Live!"
           EOF
