@@ -10,6 +10,11 @@ COPY todos.json .
 # Instead of COPY templates/ templates/, copy the file directly:
 COPY templates/index.html templates/index.html
 
+# Copy the styles too 
+COPY static/app.js static/app.js 
+COPY static/styles.css static/styles.css
+
+
 EXPOSE 5000
 ENV PORT=5000
 
