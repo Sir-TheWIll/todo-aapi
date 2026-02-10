@@ -1,4 +1,4 @@
-name: CI/CD to AWS EC2
+name: CI/CD to AWS EC2 - Todo API
 
 on:
   push:
@@ -26,7 +26,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/task-manager:latest
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/todo-aapi:latest
 
       - name: Install SSH key
         uses: webfactory/ssh-agent@v0.9.0
@@ -39,36 +39,36 @@ jobs:
           MAX_RETRIES=3
           RETRY_COUNT=0
           until ssh -o ConnectTimeout=20 -o StrictHostKeyChecking=no \
-                   ${{ secrets.AWS_SSH_USER }}@${{ secrets.AWS_SSH_HOST }} "echo '✅ SSH connection successful'"; do
+                   ${{ secrets.AWS_SSH_USER }}@${{ secrets.AWS_SSH_HOST }} "echo '✅ SSH connected'"; do
             RETRY_COUNT=$((RETRY_COUNT+1))
             if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
-              echo "❌ Failed to connect via SSH after $MAX_RETRIES attempts."
+              echo "❌ SSH failed after $MAX_RETRIES attempts."
               exit 1
             fi
-            echo "⚠️ SSH attempt $RETRY_COUNT failed. Retrying in 10 seconds..."
+            echo "⚠️ Retry $RETRY_COUNT in 10s..."
             sleep 10
           done
 
-      - name: Deploy to EC2
+      - name: Deploy Todo API to EC2
         run: |
           ssh -o ConnectTimeout=20 -o StrictHostKeyChecking=no \
             ${{ secrets.AWS_SSH_USER }}@${{ secrets.AWS_SSH_HOST }} << 'EOF'
-            echo "🔄 Pulling latest Docker image..."
-            docker pull $DOCKERHUB_USERNAME/task-manager:latest
+            echo "🔄 Pulling latest todo-aapi image..."
+            docker pull $DOCKERHUB_USERNAME/todo-aapi:latest
 
-            echo "🛑 Stopping old container (if running)..."
-            docker stop task-manager 2>/dev/null || true
-            docker rm task-manager 2>/dev/null || true
+            echo "🛑 Stopping old container..."
+            docker stop todo-api 2>/dev/null || true
+            docker rm todo-api 2>/dev/null || true
 
-            echo "🚀 Starting new container..."
+            echo "🚀 Starting new container on port 5000 (mapped to EC2 port 80)..."
             docker run -d \
-              --name task-manager \
+              --name todo-api \
               --restart unless-stopped \
-              -p 80:3000 \
-              $DOCKERHUB_USERNAME/task-manager:latest
+              -p 80:5000 \
+              $DOCKERHUB_USERNAME/todo-aapi:latest
 
-            echo "✅ Deployment completed! Container status:"
-            docker ps -f name=task-manager --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+            echo "✅ Deployment complete!"
+            docker ps -f name=todo-api --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
           EOF
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
