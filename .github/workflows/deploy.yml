@@ -12,6 +12,16 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # Ensure todos.json exists (critical for app startup)
+      - name: Create todos.json if missing
+        run: |
+          if [ ! -f todos.json ]; then
+            echo "[]"> todos.json
+            echo "⚠️ Created empty todos.json"
+          else
+            echo "✅ todos.json already exists"
+          fi
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -52,23 +62,30 @@ jobs:
       - name: Deploy Todo API to EC2
         run: |
           ssh -o ConnectTimeout=20 -o StrictHostKeyChecking=no \
-            ${{ secrets.AWS_SSH_USER }}@${{ secrets.AWS_SSH_HOST }} << 'EOF'
+            ${{ secrets.AWS_SSH_USER }}@${{ secrets.AWS_SSH_HOST }} << EOF
+            set -e  # Exit on any error
+
             echo "🔄 Pulling latest todo-aapi image..."
-            docker pull $DOCKERHUB_USERNAME/todo-aapi:latest
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/todo-aapi:latest
 
             echo "🛑 Stopping old container..."
             docker stop todo-api 2>/dev/null || true
             docker rm todo-api 2>/dev/null || true
 
-            echo "🚀 Starting new container on port 5000 (mapped to EC2 port 80)..."
+            echo "🚀 Starting new container (port 80 → 5000)..."
             docker run -d \
               --name todo-api \
               --restart unless-stopped \
               -p 80:5000 \
-              $DOCKERHUB_USERNAME/todo-aapi:latest
+              ${{ secrets.DOCKERHUB_USERNAME }}/todo-aapi:latest
 
-            echo "✅ Deployment complete!"
+            echo "⏳ Waiting 5 seconds for app to start..."
+            sleep 5
+
+            echo "✅ Deployment complete! Container status:"
             docker ps -f name=todo-api --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+
+            echo "🧪 Testing health endpoint..."
+            curl -f http://localhost:5000/health
+            echo -e "\n🎉 Health check passed!"
           EOF
-        env:
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
