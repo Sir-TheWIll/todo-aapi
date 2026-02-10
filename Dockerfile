@@ -7,7 +7,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app.py .
 COPY todos.json .
-COPY templates/ templates/   # ✅ Fixed: now has src + dest
+COPY templates templates/   # ✅ NO trailing slash on source
 
 EXPOSE 5000
 ENV PORT=5000
