@@ -16,22 +16,24 @@ jobs:
         run: |
           if [ ! -f todos.json ]; then
             echo "[]"> todos.json
-            echo "⚠️ Created empty todos.json"
+            echo "✅ Created todos.json"
           fi
 
-      - name: Set up Docker
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y docker.io
-          sudo systemctl start docker
-          sudo usermod -aG docker runner
-          newgrp docker
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and Push Docker Image
-        run: |
-          docker build --no-cache -t ${{ secrets.DOCKERHUB_USERNAME }}/todo-aapi:latest .
-          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/todo-aapi:latest
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/todo-aapi:latest
+          # Force no cache to avoid checksum issues
+          cache-from: ""
+          cache-to: ""
 
       - name: Install SSH key
         uses: webfactory/ssh-agent@v0.9.0
@@ -43,11 +45,23 @@ jobs:
           ssh -o ConnectTimeout=20 -o StrictHostKeyChecking=no \
             ${{ secrets.AWS_SSH_USER }}@${{ secrets.AWS_SSH_HOST }} << EOF
             set -e
+            echo "🔹 Pulling image..."
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/todo-aapi:latest
+
+            echo "🔹 Cleaning up..."
             docker stop todo-api 2>/dev/null || true
             docker rm todo-api 2>/dev/null || true
-            docker run -d --name todo-api --restart unless-stopped -p 80:5000 ${{ secrets.DOCKERHUB_USERNAME }}/todo-aapi:latest
+
+            echo "🔹 Starting container..."
+            docker run -d \
+              --name todo-api \
+              --restart unless-stopped \
+              -p 80:5000 \
+              ${{ secrets.DOCKERHUB_USERNAME }}/todo-aapi:latest
+
+            echo "🔹 Waiting 5s..."
             sleep 5
-            curl -f http://localhost:80/health
-            echo "✅ Live!"
+
+            echo "✅ Health check:"
+            curl -s http://localhost:80/health | head -n 1
           EOF
