@@ -12,7 +12,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Ensure todos.json exists (critical for app startup)
+      # Ensure todos.json exists to prevent app crash
       - name: Create todos.json if missing
         run: |
           if [ ! -f todos.json ]; then
@@ -72,7 +72,7 @@ jobs:
             docker stop todo-api 2>/dev/null || true
             docker rm todo-api 2>/dev/null || true
 
-            echo "🚀 Starting new container (port 80 → 5000)..."
+            echo "🚀 Starting new container (host port 80 → container port 5000)..."
             docker run -d \
               --name todo-api \
               --restart unless-stopped \
@@ -85,7 +85,7 @@ jobs:
             echo "✅ Deployment complete! Container status:"
             docker ps -f name=todo-api --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 
-            echo "🧪 Testing health endpoint..."
-            curl -f http://localhost:5000/health
-            echo -e "\n🎉 Health check passed!"
+            echo "🧪 Testing health endpoint via mapped port 80..."
+            curl -f http://localhost:80/health
+            echo -e "\n🎉 Health check passed! API is live."
           EOF
