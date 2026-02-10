@@ -7,7 +7,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app.py .
 COPY todos.json .
-COPY templates/ templates/   # ADDED THIS LINE
+COPY templates/ 
 
 EXPOSE 5000
 ENV PORT=5000
